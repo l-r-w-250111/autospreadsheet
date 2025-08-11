@@ -1,5 +1,14 @@
-import uno
+import sys
 import os
+from config import LO_PATH, LO_PYTHON_PATH
+
+# LibreOffice UNOモジュールへのパスを動的に追加
+if LO_PATH not in sys.path:
+    sys.path.insert(0, LO_PATH)
+if LO_PYTHON_PATH not in sys.path:
+    sys.path.insert(0, LO_PYTHON_PATH)
+
+import uno
 from com.sun.star.beans import PropertyValue
 
 def export_active_sheet_to_png(doc, output_path):

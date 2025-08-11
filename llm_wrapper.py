@@ -2,15 +2,11 @@ import os
 import json
 import urllib.request
 import base64
-
-# Ollamaモデルの設定
-OLLAMA_MODEL_NAME = "gemma3:12b" # コード生成に使用するモデル名
-OLLAMA_API_URL = "http://localhost:11434/api/generate"
+from config import CODE_GENERATOR_MODEL, OLLAMA_API_URL
 
 # --- プロンプトテンプレート ---
 
-GENERATOR_PROMPT_TEMPLATE = """
-あなたは、ユーザーの指示をPythonのUNO (Universal Network Objects) APIを使ったLibreOffice Calc操作コードに変換するエキスパートです。
+GENERATOR_PROMPT_TEMPLATE = """あなたは、ユーザーの指示をPythonのUNO (Universal Network Objects) APIを使ったLibreOffice Calc操作コードに変換するエキスパートです。
 
 # 厳格なルール
 - **絶対に**新しいドキュメントを作成してはいけません。`desktop.loadComponentFromURL`の使用は固く禁止します。
@@ -26,6 +22,32 @@ context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.C
 desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
 doc = desktop.getCurrentComponent()
 sheet = doc.getCurrentController().getActiveSheet()
+```
+
+# 検証クエリの生成
+- コード生成に加えて、そのコードが正しく実行されたかを確認するための「検証クエリ」をJSON形式で生成してください。
+- このクエリは、`state_extractor.py` の `get_calc_state` 関数に渡されます。
+- 生成するJSONは、コードブロックの直後に ```json ``` で囲んでください。
+- クエリのキーは、`cell_values` (リスト), `active_sheet_name`, `sheet_count`, `sheet_names`, `chart_count`, `chart_types`, `document_count` のいずれかです。
+- 指示内容に最も関連するキーと値を指定してください。
+
+例1:
+指示: 「A1セルに'Hello'と入力」
+検証クエリ:
+```json
+{{
+    "cell_values": ["A1"]
+}}
+```
+
+例2:
+指示: 「新しいシートを追加して、グラフを作成」
+検証クエリ:
+```json
+{{
+    "sheet_count": true,
+    "chart_count": true
+}}
 ```
 
 # コード生成の注意点
@@ -274,16 +296,13 @@ sheet = doc.getCurrentController().getActiveSheet()
         print("グラフタイトル・軸タイトルを設定し、表示をONにしました。")
         ```
 
-
-
-
 # 指示
 {instruction}
 
 # 過去の試行と評価 (フィードバック)
 {feedback_history}
 
-# あなたが生成するべきPythonコード:
+# あなたが生成するべき応答:
 """
 
 def _image_to_base64(image_path):
@@ -299,7 +318,7 @@ def invoke_llm(prompt):
     """
     try:
         data = {
-            "model": OLLAMA_MODEL_NAME,
+            "model": CODE_GENERATOR_MODEL,
             "prompt": prompt,
             "stream": False
         }

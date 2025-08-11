@@ -1,31 +1,39 @@
 import re
 import sys
 import os
-import uno # unoモジュールはパス追加後にインポート
+import json
+import uno
 from llm_wrapper import invoke_llm, GENERATOR_PROMPT_TEMPLATE
-from executor import execute_and_verify_with_image
-from libreoffice_manager import check_libreoffice_connection, stop_libreoffice
+from executor import execute_and_verify
+from libreoffice_manager import check_libreoffice_connection
+from config import IMAGE_VERIFIER_MODEL
 
-# --- 設定 ---
-# 画像判定に使用するOllamaのマルチモーダルモデル名を指定してください
-IMAGE_VERIFIER_MODEL = "gemma3:12b"  # 例: gemma3:12b
+def extract_code_and_query(response_text):
+    """
+    LLMの応答からPythonコードと検証用JSONクエリを抽出する。
+    """
+    # Pythonコードの抽出
+    code_pattern = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
+    code_match = code_pattern.search(response_text)
+    code = code_match.group(1).strip() if code_match else None
 
-def extract_python_code(response_text):
-    """
-    LLMの応答からPythonコードブロックを抽出する。
-    """
-    pattern = re.compile(r"```python\n(.*?)\n```", re.DOTALL)
-    match = pattern.search(response_text)
-    if match:
-        return match.group(1).strip()
-    return ""
+    # JSONクエリの抽出
+    json_pattern = re.compile(r"```json\n(.*?)\n```", re.DOTALL)
+    json_match = json_pattern.search(response_text)
+    query_str = json_match.group(1).strip() if json_match else "{}"
+    
+    try:
+        query = json.loads(query_str)
+    except json.JSONDecodeError:
+        query = {}
+
+    return code, query
 
 def main():
     """
     メインの自己改善ループを実行する。
     """
-    # --- 初期設定 ---
-    instruction = input("どのような操作をしますか？（例: A1セルに\'Hello\'と入力）: ")
+    instruction = input("どのような操作をしますか？（例: A1セルに'Hello'と入力）: ")
     if not instruction.strip():
         print("指示が入力されなかったため、処理を終了します。")
         return
@@ -36,11 +44,9 @@ def main():
 
     print(f"--- 初期指示 ---\n{instruction}\n")
 
-    # LibreOfficeの接続確認
     if not check_libreoffice_connection():
         return
 
-    # LibreOffice UNO接続の確立
     try:
         local_context = uno.getComponentContext()
         resolver = local_context.ServiceManager.createInstanceWithContext("com.sun.star.bridge.UnoUrlResolver", local_context)
@@ -55,8 +61,7 @@ def main():
         for current_iteration in range(1, max_iterations + 1):
             print(f"--- イテレーション {current_iteration}/{max_iterations} ---")
 
-            # 1. コード生成
-            print("1. コードを生成中...")
+            print("1. コードと検証クエリを生成中...")
             prompt = GENERATOR_PROMPT_TEMPLATE.format(
                 instruction=instruction,
                 feedback_history=feedback_history
@@ -66,18 +71,20 @@ def main():
                 print("コード生成に失敗しました。処理を中断します。")
                 break
 
-            code_to_execute = extract_python_code(generated_text)
+            code_to_execute, verification_query = extract_code_and_query(generated_text)
+
             if not code_to_execute:
                 print("応答からPythonコードを抽出できませんでした。")
                 feedback_history += f"\n試行{current_iteration}: コードブロックが生成されませんでした。"
                 continue
 
             print(f"生成されたコード:\n---\n{code_to_execute}\n---")
+            print(f"生成された検証クエリ:\n---\n{json.dumps(verification_query, indent=2, ensure_ascii=False)}\n---")
 
-            # 2. コードの実行と画像による検証
-            print("2. コードを実行し、画像で検証中...")
-            verification_result, is_pass = execute_and_verify_with_image(
+            print("2. コードを実行し、ハイブリッド検証中...")
+            verification_result, is_pass = execute_and_verify(
                 code_string=code_to_execute,
+                verification_query=verification_query,
                 doc=doc,
                 desktop=desktop,
                 instruction=instruction,
@@ -86,7 +93,6 @@ def main():
 
             print(f"検証結果:\n---\n{verification_result}\n---")
 
-            # 3. 結果の判定とフィードバックの更新
             if is_pass:
                 print("\n--- タスク成功！ ---")
                 final_code = code_to_execute
@@ -101,7 +107,6 @@ def main():
                 print("\n--- 最大試行回数に達しました ---")
 
     finally:
-        # LibreOfficeのプロセス管理は行わない
         pass
 
     print("\n--- 処理完了 ---")

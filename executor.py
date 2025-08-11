@@ -1,11 +1,9 @@
 import sys
 import os
+import json
+from config import LO_PATH, LO_PYTHON_PATH
 
 # LibreOffice UNOモジュールへのパスを動的に追加
-# LibreOfficeのインストールパスに合わせて適宜変更してください
-LO_PATH = r"C:\Program Files\LibreOffice\program"
-LO_PYTHON_PATH = os.path.join(LO_PATH, "python-core", "lib")
-
 if LO_PATH not in sys.path:
     sys.path.insert(0, LO_PATH)
 if LO_PYTHON_PATH not in sys.path:
@@ -16,39 +14,42 @@ import traceback
 from com.sun.star.beans import PropertyValue
 from libreoffice_manager import set_cell_value, get_cell_value, get_sheet, save_document, close_document
 from llm_wrapper import invoke_llm_with_image
+from state_extractor import get_calc_state
 import capture_png
 
-# 画像判定用のプロンプトテンプレート
-VERIFICATION_PROMPT_TEMPLATE = """
-以下は、表計算ソフトLibreOffice Calcに対する操作指示と、その操作が実行された後のシートの画像です。
-あなたのタスクは、画像を見て、指示された操作が正しく実行されているかを厳密に判定することです。
+# ハイブリッド検証用の新しいプロンプトテンプレート
+VERIFICATION_PROMPT_TEMPLATE = """You are a meticulous and detail-oriented AI assistant for spreadsheet verification.
+Your task is to determine if an operation was successful by comparing the user's instruction against objective data from the application's API and a screenshot of the user interface.
 
-# 指示内容
+# User Instruction
 {instruction}
 
-# 判定
-- 指示通りの変更が正確に行われていますか？
-- 指示にない余計な変更（副作用）はありませんか？
+# Objective State Data (from API)
+This data is the ground truth. Trust this data over the image if there is a conflict.
+```json
+{objective_state}
+```
 
-判定結果を、必ず以下の形式で、理由を簡潔に述べてください。
+# Analysis Steps
+1.  **Analyze Objective Data**: Does the objective state data reflect the result of the user's instruction? For example, if the instruction was to create a chart, does `chart_count` show an increase?
+2.  **Examine Image**: Look at the screenshot. Does it visually confirm the state described in the objective data?
+3.  **Synthesize and Conclude**: Based on the objective data (primary source) and the image (secondary confirmation), was the instruction successfully executed?
 
-判定: [PASSまたはFAIL]
-理由: [判定の根拠]
+**Crucial Instruction**: Do NOT invent or hallucinate elements. If the objective data says `chart_count` is 0, and you think you see a chart in the image, you MUST conclude there is no chart. The objective data is the truth.
+
+# Final Verdict
+Verdict: [PASS or FAIL]
+Reason: [Your reasoning, referencing both objective data and the image]
 """
 
-def execute_code(code_string, doc, desktop): # doc, desktop を引数に追加
+def execute_code(code_string, doc, desktop):
     """
-    与えられたPythonコードを実行する。
-    LibreOfficeのUNO環境で実行されることを想定。
+    Executes the given Python code string.
     """
     try:
-        # 生成されたコードを前処理: uno.awt.Rectangle を uno.createUnoStruct に置換
         processed_code_string = code_string.replace(
             "uno.awt.Rectangle(", "uno.createUnoStruct(\"com.sun.star.awt.Rectangle\", "
         )
-
-        # Provide doc and desktop to the execution context
-        # libreoffice_managerの関数も渡す
         exec(processed_code_string, {
             'doc': doc,
             'desktop': desktop,
@@ -58,45 +59,53 @@ def execute_code(code_string, doc, desktop): # doc, desktop を引数に追加
             'save_document': save_document,
             'close_document': close_document
         })
-        return None, "コードは正常に実行されました。"
+        return None, "Code executed successfully."
     except Exception as e:
-        # エラーが発生した場合、その情報を返す
-        error_message = f"コード実行エラー: {type(e).__name__}: {e}\n"
+        error_message = f"Code execution error: {type(e).__name__}: {e}\n"
         error_message += "".join(traceback.format_exc())
         return error_message, None
 
 def save_sheet_as_png(doc, output_path):
     """
-    現在のLibreOffice CalcのアクティブシートをPNG画像として保存する。
-    capture_png.pyの機能を利用する。
+    Saves the active sheet as a PNG image.
     """
     try:
         capture_png.export_active_sheet_to_png(doc, output_path)
         return None
     except Exception as e:
-        error_message = f"PNG保存エラー: {type(e).__name__}: {e}\n"
+        error_message = f"PNG save error: {type(e).__name__}: {e}\n"
         error_message += "".join(traceback.format_exc())
         print(error_message)
         return error_message
 
-def execute_and_verify_with_image(code_string, doc, desktop, instruction, image_verifier_model):
+def execute_and_verify(code_string, verification_query, doc, desktop, instruction, image_verifier_model):
     """
-    コードを実行し、結果をPNG画像で保存し、LLMで成否を判定する。
+    Executes code, gets objective state, and verifies the result with an image and state data.
     """
-    # 1. コードを実行
+    # 1. Execute the code
     execution_error, result_message = execute_code(code_string, doc, desktop)
     if execution_error:
-        return f"実行時エラー: {execution_error}", False
+        return f"Execution Error: {execution_error}", False
 
-    # 2. 結果をPNGに保存
+    # 2. Get objective state from the application
+    try:
+        objective_state = get_calc_state(verification_query)
+    except Exception as e:
+        return f"State Extraction Error: {e}", False
+
+    # 3. Save the resulting state as a PNG image
     temp_image_path = os.path.join(os.getcwd(), "verification.png")
     save_error = save_sheet_as_png(doc, temp_image_path)
     if save_error:
-        return f"画像保存エラー: {save_error}", False
+        return f"Image Save Error: {save_error}", False
 
-    # 3. LLMによる画像判定
+    # 4. Verify with LLM using both objective data and the image
     try:
-        prompt = VERIFICATION_PROMPT_TEMPLATE.format(instruction=instruction)
+        prompt = VERIFICATION_PROMPT_TEMPLATE.format(
+            instruction=instruction,
+            objective_state=json.dumps(objective_state, indent=2, ensure_ascii=False)
+        )
+        
         verification_result = invoke_llm_with_image(
             prompt=prompt,
             image_path=temp_image_path,
@@ -104,15 +113,15 @@ def execute_and_verify_with_image(code_string, doc, desktop, instruction, image_
         )
 
         if verification_result is None:
-            return "画像判定LLMからの応答がありません。", False
+            return "Image verification LLM returned no response.", False
 
-        # 判定結果からPASS/FAILを抽出（簡易的な抽出）
+        # Simple pass/fail check
         is_pass = "pass" in verification_result.lower()
         
         return verification_result, is_pass
 
     finally:
-        # 4. 一時ファイルを削除 (デバッグのためコメントアウト)
+        # Keep the image for debugging purposes
         # if os.path.exists(temp_image_path):
         #     os.remove(temp_image_path)
-        pass # Do nothing for now
+        pass

@@ -1,10 +1,16 @@
+import sys
+import os
 import subprocess
 import time
-import os
-import uno
+from config import LO_PATH, LO_PYTHON_PATH, LIBREOFFICE_EXECUTABLE, UNO_CONNECTION_STRING
 
-UNO_CONNECTION_STRING = "uno:socket,host=localhost,port=2002;urp;"
-LIBREOFFICE_PATH = "C:\Program Files\LibreOffice\program\scalce.exe" 
+# LibreOffice UNOモジュールへのパスを動的に追加
+if LO_PATH not in sys.path:
+    sys.path.insert(0, LO_PATH)
+if LO_PYTHON_PATH not in sys.path:
+    sys.path.insert(0, LO_PYTHON_PATH)
+
+import uno
 
 def check_libreoffice_connection(retries=5, delay=5):
     """
@@ -22,11 +28,11 @@ def check_libreoffice_connection(retries=5, delay=5):
             if i == 0:
                 print("LibreOffice is not running or not connected. Attempting to start it...")
                 try:
-                    subprocess.Popen([LIBREOFFICE_PATH, f'--accept={UNO_CONNECTION_STRING}', '--norestore'])
+                    subprocess.Popen([LIBREOFFICE_EXECUTABLE, f'--accept={UNO_CONNECTION_STRING}', '--norestore'])
                     print("Waiting for LibreOffice to start...")
                 except FileNotFoundError:
-                    print(f"Error: Could not find LibreOffice executable at {LIBREOFFICE_PATH}")
-                    print("Please ensure LibreOffice is installed in the correct directory or update the path in libreoffice_manager.py.")
+                    print(f"Error: Could not find LibreOffice executable at {LIBREOFFICE_EXECUTABLE}")
+                    print("Please ensure LibreOffice is installed in the correct directory or update the path in config.py.")
                     return False
                 except Exception as e:
                     print(f"Failed to start LibreOffice: {e}")
