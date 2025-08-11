@@ -10,7 +10,7 @@ This program leverages the power of Large Language Models (LLMs) to automate spr
 ## How to use:  
 * Preliminary preparations
     * Ollama (accepted at “http://localhost:11434/api/generate”)
-        * Multimodal model (e.g., gemma3; Replace ‘IMAGE_VERIFIER_MODEL’ in 'main.py' with your model and use it.)
+        * Multimodal model (e.g., gemma3; Replace ‘IMAGE_VERIFIER_MODEL’ in 'config.py' with your model and use it.)
 * Start the LibreOffice Calc (spreadsheet software) in listening mode  
   `"C:\Program Files\LibreOffice\program\soffice.exe" --calc --accept="socket,host=localhost,port=2002;urp;" --norestore`
 * Start **autospreadsheet**  
