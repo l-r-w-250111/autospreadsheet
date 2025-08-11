@@ -65,6 +65,34 @@ sheet = doc.getCurrentController().getActiveSheet()
 
         print("A1に 123 を入力しました。")
         ```
+    
+    # アクティブなシートの"B2"セルに"=SUM(A1:A10)"と入力するコード
+        ```python    
+        import uno
+
+        # LibreOfficeに接続
+        local_context = uno.getComponentContext()
+        resolver = local_context.ServiceManager.createInstanceWithContext(
+            "com.sun.star.bridge.UnoUrlResolver", local_context)
+        context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
+
+        desktop = context.ServiceManager.createInstanceWithContext(
+            "com.sun.star.frame.Desktop", context)
+
+        # 現在開いているドキュメントを取得
+        document = desktop.getCurrentComponent()
+
+        # アクティブなシートを取得
+        controller = document.getCurrentController()
+        sheet = controller.getActiveSheet()
+
+        # セルに数式を設定
+        cell = sheet.getCellRangeByName("B2")
+        cell.setFormula("=SUM(A1:A10)")
+
+        ```
+        
+
 
     # アクティブなシートの最初のグラフを折れ線グラフに変更する。
         ```python
@@ -295,7 +323,7 @@ def invoke_llm(prompt):
 def invoke_llm_with_image(prompt, image_path, model_name):
     """
     プロンプトと画像をOllamaに送信し、応答を返す。
-    画像解析が可能なマルチモーダルモデル（例: llava）を指定してください。
+    画像解析が可能なマルチモーダルモデルを指定してください。
     """
     image_b64 = _image_to_base64(image_path)
     if not image_b64:
