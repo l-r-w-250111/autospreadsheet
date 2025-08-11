@@ -1,5 +1,5 @@
 # autospreadsheet
-Manipulate spreadsheets(LibreOffice Calc-UNO) with LLM
+Manipulate spreadsheets(LibreOffice Calc-UNO) with LLM  
 1 The first LLM writes the instructions as Universal Network Objects.   
 2 It then operates the specified OpenOffice application.  
 3 The second LLM evaluates whether the application's output matches the given instructions and sends the evaluation results back to the first LLM.  
