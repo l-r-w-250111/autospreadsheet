@@ -1,11 +1,13 @@
 # autospreadsheet
-Manipulate spreadsheets(LibreOffice Calc-UNO) with LLM  
-1 The first LLM writes the instructions as Universal Network Objects.   
-2 It then operates the specified OpenOffice application.  
-3 The second LLM evaluates whether the application's output matches the given instructions and sends the evaluation results back to the first LLM.  
-4 The first LLM makes improvements based on the feedback provided by the second LLM.   
+**Let AI Handle Your LibreOffice Calc Tasks and Dramatically Boost Your Productivity**  
+This program leverages the power of Large Language Models (LLMs) to automate spreadsheet manipulation and chart creation.
 
-## How to use  
+## How It Works:
+* You Provide the Instructions: Simply tell the program what you want to do in plain language.  
+* The AI Does the Work: Two LLMs collaborate to operate LibreOffice Calc according to your instructions.  
+* Self-Correcting: The AI evaluates its own output and automatically makes corrections until the desired result is achieved, ensuring accurate and reliable outcomes.
+
+## How to use:  
 * Preliminary preparations
     * Ollama (accepted at “http://localhost:11434/api/generate”)
         * Multimodal model (e.g., gemma3; Replace ‘IMAGE_VERIFIER_MODEL’ in 'main.py' with your model and use it.)
