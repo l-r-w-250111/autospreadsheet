@@ -18,7 +18,7 @@ Manipulate spreadsheets(LibreOffice Calc-UNO) with LLM
 ```mermaid
 sequenceDiagram
     actor U as User
-    participant L as LLM(text, image)
+    participant L as LLMs(text, image)
     participant S as LibreOffice
     U->>L: instructions
     L->>S: UNO Python code
