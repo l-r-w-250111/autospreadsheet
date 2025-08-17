@@ -12,9 +12,13 @@ This program leverages the power of Large Language Models (LLMs) to automate spr
     * Ollama (accepted at “http://localhost:11434/api/generate”)
         * Multimodal model (e.g., gemma3; Replace ‘IMAGE_VERIFIER_MODEL’ in 'config.py' with your model and use it.)
 * Start the LibreOffice Calc (spreadsheet software) in listening mode  
-  `"C:\Program Files\LibreOffice\program\soffice.exe" --calc --accept="socket,host=localhost,port=2002;urp;" --norestore`
+  ```sh
+  "C:\Program Files\LibreOffice\program\soffice.exe" --calc --accept="socket,host=localhost,port=2002;urp;" --norestore
+  ```
 * Start **autospreadsheet**  
-  `"C:\Program Files\LibreOffice\program\python.exe" "main.py"`
+  ```sh
+  "C:\Program Files\LibreOffice\program\python.exe" "main.py"
+  ```
 
 ## Data flow
 ```mermaid
@@ -27,3 +31,7 @@ sequenceDiagram
     S-->>L: capture image
     L-->>U: Success/failure notification
 ```
+
+## Discussions
+https://github.com/l-r-w-250111/autospreadsheet/discussions/1#discussioncomment-14093336  
+
