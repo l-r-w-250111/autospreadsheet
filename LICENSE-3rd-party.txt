@@ -1,0 +1,8 @@
+This project uses the following third-party libraries:
+
+## uno (Python-UNO bridge)
+
+The `uno` module, which is part of the LibreOffice project, is used to interact with LibreOffice applications.
+
+-   **License**: Mozilla Public License v2.0 (MPL-2.0)
+-   **License Text**: https://www.mozilla.org/en-US/MPL/2.0/
